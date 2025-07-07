@@ -11,6 +11,9 @@ importers:
       '@nostr-dev-kit/ndk':
         specifier: ^2.14.29
         version: 2.14.29(nostr-tools@2.15.0(typescript@5.8.3))
+      nostr-tools:
+        specifier: ^2.15.0
+        version: 2.15.0(typescript@5.8.3)
       react:
         specifier: ^19.1.0
         version: 19.1.0

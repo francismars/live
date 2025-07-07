@@ -4,9 +4,10 @@ interface UserDropdownProps {
   show: boolean;
   onClose: () => void;
   onLogout: () => void;
+  onProfile: () => void;
 }
 
-const UserDropdown: React.FC<UserDropdownProps> = ({ show, onClose, onLogout }) => {
+const UserDropdown: React.FC<UserDropdownProps> = ({ show, onClose, onLogout, onProfile }) => {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -29,7 +30,7 @@ const UserDropdown: React.FC<UserDropdownProps> = ({ show, onClose, onLogout }) 
 
   return (
     <div ref={ref} className="absolute top-16 right-0 mt-2 w-56 bg-white text-black rounded-xl shadow-xl z-50 py-2 flex flex-col">
-      <button className="text-left px-6 py-3 hover:bg-gray-100 transition" onClick={onClose}>View Profile</button>
+      <button className="text-left px-6 py-3 hover:bg-gray-100 transition" onClick={() => { onProfile(); onClose(); }}>View Profile</button>
       <button className="text-left px-6 py-3 hover:bg-gray-100 transition" onClick={onClose}>MMR / Stats</button>
       <button className="text-left px-6 py-3 hover:bg-gray-100 transition" onClick={onClose}>Balance</button>
       <button className="text-left px-6 py-3 hover:bg-gray-100 transition" onClick={onClose}>Settings</button>

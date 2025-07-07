@@ -4,9 +4,11 @@ interface SignInModalProps {
   show: boolean;
   onClose: () => void;
   onExtensionSignIn: () => void;
+  onKeySignIn: () => void;
+  onRegister: () => void;
 }
 
-const SignInModal: React.FC<SignInModalProps> = ({ show, onClose, onExtensionSignIn }) => (
+const SignInModal: React.FC<SignInModalProps> = ({ show, onClose, onExtensionSignIn, onKeySignIn, onRegister }) => (
   <div
     className={`absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-30 transition-all duration-500 ${
       show ? 'scale-100 opacity-100' : 'scale-75 opacity-0 pointer-events-none'
@@ -22,8 +24,8 @@ const SignInModal: React.FC<SignInModalProps> = ({ show, onClose, onExtensionSig
       </button>
       <div className="text-2xl font-bold mb-4">Sign In</div>
       <button className="w-full py-3 px-6 text-lg font-semibold rounded-full bg-black text-white hover:bg-gray-900 transition" onClick={onExtensionSignIn}>Extension</button>
-      <button className="w-full py-3 px-6 text-lg font-semibold rounded-full bg-black text-white hover:bg-gray-900 transition">Key</button>
-      <button className="w-full py-3 px-6 text-lg font-semibold rounded-full bg-gray-200 text-black hover:bg-gray-300 transition mt-2">Register</button>
+      <button className="w-full py-3 px-6 text-lg font-semibold rounded-full bg-black text-white hover:bg-gray-900 transition" onClick={onKeySignIn}>Key</button>
+      <button className="w-full py-3 px-6 text-lg font-semibold rounded-full bg-gray-200 text-black hover:bg-gray-300 transition mt-2" onClick={onRegister}>Register</button>
     </div>
   </div>
 );
