@@ -17,7 +17,9 @@ const UserProfileModal: React.FC<{ show: boolean; onClose: () => void; pubkey: s
         <button className="absolute top-4 left-4 text-black hover:text-gray-700 text-2xl font-bold px-2 py-1 rounded-full focus:outline-none" onClick={onClose} aria-label="Close profile modal">
           <span className="material-symbols-outlined">arrow_back</span>
         </button>
-        {profile?.image && <img src={profile.image} alt="User avatar" className="w-24 h-24 rounded-full mb-4 object-cover border-2 border-black" />}
+        {(profile?.image || profile?.picture) && (
+          <img src={profile.image || profile.picture} alt="User avatar" className="w-24 h-24 rounded-full mb-4 object-cover border-2 border-black" />
+        )}
         <div className="text-xl font-bold mb-2">{profile?.name || 'Nostr User'}</div>
         <div className="text-xs text-gray-500 break-all mb-2">{npub}</div>
         {profile?.about && <div className="mb-2 text-center text-gray-700">{profile.about}</div>}

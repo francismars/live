@@ -1,12 +1,25 @@
 import React, { useState } from 'react';
 import useAnimatedPresence from '../shared/useAnimatedPresence';
 
-const CreateMatchMenu: React.FC<{ show: boolean; onBack: () => void }> = ({ show, onBack }) => {
+interface CreateMatchMenuProps {
+  show: boolean;
+  onBack: () => void;
+  onCreate: (options: {
+    gameType: 'normal' | 'ranked';
+    stake: string;
+    timeLimit: string;
+    visibility: 'public' | 'private';
+    allowSpectators: boolean;
+  }) => void;
+}
+
+const CreateMatchMenu: React.FC<CreateMatchMenuProps> = ({ show, onBack, onCreate }) => {
   const isVisible = useAnimatedPresence(show);
   const [gameType, setGameType] = useState<'normal' | 'ranked'>('normal');
   const [stake, setStake] = useState('');
   const [timeLimit, setTimeLimit] = useState('5');
   const [visibility, setVisibility] = useState<'public' | 'private'>('private');
+  const [allowSpectators, setAllowSpectators] = useState(true);
 
   if (!isVisible) return null;
   return (
@@ -39,8 +52,32 @@ const CreateMatchMenu: React.FC<{ show: boolean; onBack: () => void }> = ({ show
               <button onClick={() => setVisibility('public')} className={`px-4 py-2 rounded-full font-semibold border ${visibility === 'public' ? 'bg-black text-white' : 'bg-gray-100 text-black'} transition`}>Public</button>
             </div>
           </div>
+          <div>
+            <label className="flex items-center gap-2 font-semibold">
+              <input
+                type="checkbox"
+                checked={allowSpectators}
+                onChange={e => setAllowSpectators(e.target.checked)}
+                className="accent-black"
+              />
+              Allow Spectators
+            </label>
+          </div>
         </div>
-        <button className="mt-8 w-full py-3 rounded-full bg-black text-white font-bold text-lg hover:bg-gray-900 transition">Create Game</button>
+        <button
+          className="mt-8 w-full py-3 rounded-full bg-black text-white font-bold text-lg hover:bg-gray-900 transition"
+          onClick={() => {
+            onCreate({
+              gameType,
+              stake,
+              timeLimit,
+              visibility,
+              allowSpectators,
+            });
+          }}
+        >
+          Create Game
+        </button>
       </div>
     </div>
   );

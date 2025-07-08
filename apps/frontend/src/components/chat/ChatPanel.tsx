@@ -3,17 +3,14 @@ import { ndk } from '../shared/nostrProfile';
 import { NDKEvent } from '@nostr-dev-kit/ndk';
 import fetchNostrProfile from '../shared/nostrProfile';
 import { finalizeEvent } from 'nostr-tools';
-
-// Replace with your actual global room event ID and relay
-const GLOBAL_ROOM_EVENT_ID = 'f412192fdc846952c75058e911d37a7392aa7fd2e727330f4344badc92fb8a22'; // TODO: Replace with real event id
-const GLOBAL_ROOM_RELAY = 'wss://relay.nostr.band';
-
-interface ChatMessage {
-  id: string;
-  pubkey: string;
-  content: string;
-  created_at: number;
-}
+import type { ChatMessage as ChatMessageType, ProfileMap } from '../shared/chatConfig';
+import {
+  GLOBAL_ROOM_EVENT_ID,
+  GLOBAL_ROOM_RELAYS,
+  hexToUint8Array,
+} from '../shared/chatConfig';
+import ChatMessage from './ChatMessage';
+import useNostrProfiles from '../shared/useNostrProfiles';
 
 interface ChatPanelProps {
   onClose: () => void;
@@ -22,30 +19,13 @@ interface ChatPanelProps {
   authMethod: 'extension' | 'key' | null;
 }
 
-// Helper to extract image URLs from text
-function extractImageUrls(text: string): string[] {
-  const urlRegex = /(https?:\/\/(?:[\w-]+\.)+[\w-]+(?:\/[\w\-._~:/?#[\]@!$&'()*+,;=]*)?\.(?:jpg|jpeg|png|gif|webp))(\?[^\s]*)?/gi;
-  const matches = text.match(urlRegex);
-  return matches || [];
-}
-
-// Helper to remove image URLs from text
-function removeImageUrls(text: string, imageUrls: string[]): string {
-  let result = text;
-  imageUrls.forEach(url => {
-    // Remove the URL, and any leading/trailing whitespace
-    result = result.replace(url, '').replace(/\s{2,}/g, ' ');
-  });
-  return result.trim();
-}
-
 const ChatPanel: React.FC<ChatPanelProps> = ({ onClose, userPubkey, userPrivkey, authMethod }) => {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessageType[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [profiles, setProfiles] = useState<Record<string, { name?: string; image?: string }>>({});
+  const profiles = useNostrProfiles(messages.map(m => m.pubkey));
 
   useEffect(() => {
     setLoading(true);
@@ -72,20 +52,9 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ onClose, userPubkey, userPrivkey,
   }, []);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
-  // Fetch sender profiles for all unique pubkeys in messages
-  useEffect(() => {
-    const uniquePubkeys = Array.from(new Set(messages.map(m => m.pubkey)));
-    uniquePubkeys.forEach(pubkey => {
-      if (!profiles[pubkey]) {
-        fetchNostrProfile(pubkey).then(profile => {
-          setProfiles(prev => ({ ...prev, [pubkey]: profile }));
-        });
-      }
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 0);
   }, [messages]);
 
   const handleSend = async (e: React.FormEvent) => {
@@ -97,7 +66,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ onClose, userPubkey, userPrivkey,
         content: input,
         tags: [
           ['e', GLOBAL_ROOM_EVENT_ID],
-          ['r', GLOBAL_ROOM_RELAY],
+          ...GLOBAL_ROOM_RELAYS.map(relay => ['r', relay]),
         ],
         pubkey: userPubkey,
         created_at: Math.floor(Date.now() / 1000),
@@ -106,15 +75,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ onClose, userPubkey, userPrivkey,
       if (authMethod === 'extension' && window.nostr && window.nostr.signEvent) {
         signedEvent = await window.nostr.signEvent(unsignedEvent);
       } else if (authMethod === 'key' && userPrivkey) {
-        // Convert privkey to Uint8Array if needed
-        const hexToUint8Array = (hex: string) => {
-          if (hex.length % 2 !== 0) throw new Error('Invalid hex string');
-          const arr = new Uint8Array(hex.length / 2);
-          for (let i = 0; i < hex.length; i += 2) {
-            arr[i / 2] = parseInt(hex.slice(i, i + 2), 16);
-          }
-          return arr;
-        };
         signedEvent = finalizeEvent(unsignedEvent, hexToUint8Array(userPrivkey));
       } else {
         throw new Error('No signing method available');
@@ -136,27 +96,9 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ onClose, userPubkey, userPrivkey,
       <div className="max-h-64 min-h-40 overflow-y-auto mb-2 bg-gray-50 rounded p-2 text-sm text-gray-700 flex-1 scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100">
         {loading && <div className="text-center text-xs text-gray-400">Loading...</div>}
         {error && <div className="text-center text-xs text-red-500">{error}</div>}
-        {messages.map((msg) => {
-          const imageUrls = extractImageUrls(msg.content);
-          const cleanedText = removeImageUrls(msg.content, imageUrls);
-          return (
-            <div key={msg.id} className="mb-2">
-              <span className="font-bold text-xs text-gray-600">
-                {profiles[msg.pubkey]?.name
-                  ? profiles[msg.pubkey].name
-                  : msg.pubkey.slice(0, 8)}
-                :
-              </span> {cleanedText}
-              {imageUrls.length > 0 && (
-                <div className="flex flex-col gap-1 mt-1">
-                  {imageUrls.map(url => (
-                    <img key={url} src={url} alt="chat-img" className="max-h-32 max-w-full rounded border" />
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
+        {messages.map((msg) => (
+          <ChatMessage key={msg.id} msg={msg} profile={profiles[msg.pubkey]} />
+        ))}
         <div ref={messagesEndRef} />
       </div>
       <form onSubmit={handleSend} className="flex gap-2">
