@@ -1,37 +1,52 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 interface SnakeGameProps {
   gameState: any;
 }
 
-const CELL_SIZE = 32;
+// Remove fixed CELL_SIZE
 const GRID_COLOR = '#333';
 const PLAYER_COLORS = ['#fff', '#222'];
 const FOOD_COLOR = '#ff0';
 
 const SnakeGame: React.FC<SnakeGameProps> = ({ gameState }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [canvasSize, setCanvasSize] = useState({ width: 700, height: 350 });
+
+  // Responsive canvas size
+  useEffect(() => {
+    function handleResize() {
+      setCanvasSize({
+        width: window.innerWidth * 0.7,
+        height: window.innerWidth * 0.35,
+      });
+    }
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     if (!gameState || !canvasRef.current) return;
     const ctx = canvasRef.current.getContext('2d');
     if (!ctx) return;
     const { boardSize, players, food } = gameState;
-    const width = boardSize.width * CELL_SIZE;
-    const height = boardSize.height * CELL_SIZE;
+    const { width, height } = canvasSize;
+    const colSize = width / boardSize.width;
+    const rowSize = height / boardSize.height;
     ctx.clearRect(0, 0, width, height);
     // Draw grid
     ctx.strokeStyle = GRID_COLOR;
     for (let x = 0; x <= boardSize.width; x++) {
       ctx.beginPath();
-      ctx.moveTo(x * CELL_SIZE, 0);
-      ctx.lineTo(x * CELL_SIZE, height);
+      ctx.moveTo(x * colSize, 0);
+      ctx.lineTo(x * colSize, height);
       ctx.stroke();
     }
     for (let y = 0; y <= boardSize.height; y++) {
       ctx.beginPath();
-      ctx.moveTo(0, y * CELL_SIZE);
-      ctx.lineTo(width, y * CELL_SIZE);
+      ctx.moveTo(0, y * rowSize);
+      ctx.lineTo(width, y * rowSize);
       ctx.stroke();
     }
     // Draw snakes
@@ -39,7 +54,7 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ gameState }) => {
       ctx.fillStyle = PLAYER_COLORS[idx % PLAYER_COLORS.length];
       player.snake.forEach((seg: any, i: number) => {
         ctx.globalAlpha = i === 0 ? 1 : 0.7;
-        ctx.fillRect(seg.x * CELL_SIZE, seg.y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+        ctx.fillRect(seg.x * colSize, seg.y * rowSize, colSize, rowSize);
       });
       ctx.globalAlpha = 1;
     });
@@ -47,18 +62,17 @@ const SnakeGame: React.FC<SnakeGameProps> = ({ gameState }) => {
     ctx.fillStyle = FOOD_COLOR;
     ctx.beginPath();
     ctx.arc(
-      food.x * CELL_SIZE + CELL_SIZE / 2,
-      food.y * CELL_SIZE + CELL_SIZE / 2,
-      CELL_SIZE / 2.5,
+      food.x * colSize + colSize / 2,
+      food.y * rowSize + rowSize / 2,
+      Math.min(colSize, rowSize) / 2.5,
       0,
       2 * Math.PI
     );
     ctx.fill();
-  }, [gameState]);
+  }, [gameState, canvasSize]);
 
   if (!gameState) return <div className="text-center text-gray-400">Waiting for game state...</div>;
-  const width = gameState.boardSize.width * CELL_SIZE;
-  const height = gameState.boardSize.height * CELL_SIZE;
+  const { width, height } = canvasSize;
 
   return (
     <canvas

@@ -146,7 +146,6 @@ const GamePage: React.FC = () => {
       </div>
       {/* Game area */}
       <div className="flex-1 flex items-center justify-center relative">
-        <div className="relative w-[900px] h-[600px] bg-black bg-opacity-80 rounded-xl border-2 border-gray-700 flex items-center justify-center overflow-hidden">
           {countdown !== null && (
             <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-70 z-10">
               <div className="text-8xl font-extrabold text-white">
@@ -155,7 +154,6 @@ const GamePage: React.FC = () => {
             </div>
           )}
           <SnakeGame gameState={gameState} />
-        </div>
       </div>
       {/* Bottom bar (optional, for block info, etc.) */}
       <div className="w-full flex justify-between items-center px-12 pb-4 text-xs text-gray-400">

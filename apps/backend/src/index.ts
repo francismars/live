@@ -86,7 +86,7 @@ function startGameForRoom(roomId: string) {
         console.log(`[startGameForRoom] Game ended, clearing interval for room ${roomId}`);
         clearInterval(snakeGame.games[roomId].interval);
       }
-    }, 1000);
+    }, 100);
   } else {
     console.log(`[startGameForRoom] Game loop already running for room ${roomId}`);
   }

@@ -7,6 +7,8 @@ export interface SnakePlayer {
   direction: string;
   snake: Array<{ x: number; y: number }>;
   alive: boolean;
+  spawn: { x: number; y: number };
+  initialDirection: string;
 }
 
 export interface SnakeGameState {
@@ -20,10 +22,10 @@ export interface SnakeGameState {
 
 export const games: { [roomId: string]: SnakeGameState } = {};
 
-const BOARD_WIDTH = 20;
-const BOARD_HEIGHT = 15;
+const BOARD_WIDTH = 51;
+const BOARD_HEIGHT = 25;
 const INITIAL_SATS = 1000;
-const TICK_RATE = 120; // ms
+const TICK_RATE = 100; // ms (10 frames per second)
 
 function randomPosition() {
   return {
@@ -45,19 +47,32 @@ export function initGame(roomId: string, players: Array<{ pubkey: string; name: 
   console.log(`[initGame] Initializing game for room ${roomId} with players:`, players);
   // players: [{ pubkey, name, buyIn }]
   const snakes = [
-    [{ x: 3, y: Math.floor(BOARD_HEIGHT / 2) }],
-    [{ x: BOARD_WIDTH - 4, y: Math.floor(BOARD_HEIGHT / 2) }],
+    [
+      { x: 6, y: 12 }, // p1 head
+      { x: 5, y: 12 }, // p1 body
+    ],
+    [
+      { x: 44, y: 12 }, // p2 head
+      { x: 45, y: 12 }, // p2 body
+    ],
   ];
+  const spawns = [
+    { x: 6, y: 12 },
+    { x: 44, y: 12 },
+  ];
+  const directions = ['right', 'left'];
   games[roomId] = {
     players: players.map((p, i) => ({
       ...p,
       sats: p.buyIn || INITIAL_SATS,
       initialSats: p.buyIn || INITIAL_SATS,
-      direction: i === 0 ? 'right' : 'left',
+      direction: directions[i],
+      initialDirection: directions[i],
       snake: snakes[i],
       alive: true,
+      spawn: spawns[i],
     })),
-    food: randomPosition(),
+    food: { x: 25, y: 12 }, // coinbase position
     boardSize: { width: BOARD_WIDTH, height: BOARD_HEIGHT },
     status: 'running',
     winner: null,
@@ -81,7 +96,22 @@ export function gameTick(roomId: string): void {
   if (!game || game.status !== 'running') return;
   // Move snakes
   for (const player of game.players) {
-    if (!player.alive) continue;
+    if (!player.alive) {
+      // Respawn logic: reset snake to spawn, direction, and length 2
+      player.snake = [
+        { x: player.spawn.x, y: player.spawn.y },
+        player.initialDirection === 'right'
+          ? { x: player.spawn.x - 1, y: player.spawn.y }
+          : player.initialDirection === 'left'
+          ? { x: player.spawn.x + 1, y: player.spawn.y }
+          : player.initialDirection === 'up'
+          ? { x: player.spawn.x, y: player.spawn.y + 1 }
+          : { x: player.spawn.x, y: player.spawn.y - 1 },
+      ];
+      player.direction = player.initialDirection;
+      player.alive = true;
+      continue;
+    }
     const head = { ...player.snake[0] };
     if (player.direction === 'up') head.y--;
     if (player.direction === 'down') head.y++;
@@ -140,6 +170,8 @@ export function getGameState(roomId: string): SnakeGameState | null {
       direction: p.direction,
       snake: p.snake,
       alive: p.alive,
+      spawn: p.spawn,
+      initialDirection: p.initialDirection,
     })),
     food: game.food,
     boardSize: game.boardSize,
