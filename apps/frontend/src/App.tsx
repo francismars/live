@@ -1,11 +1,16 @@
 import './App.css'
 import MainMenu from './components/menu/MainMenu'
-import { BrowserRouter } from 'react-router-dom'
+import GamePage from './components/game/GamePage'
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
 
 function App() {
   return (
     <BrowserRouter>
-      <MainMenu />
+      <Routes>
+        <Route path="/" element={<MainMenu />} />
+        <Route path="/join/:roomId" element={<MainMenu />} />
+        <Route path="/game/:roomId" element={<GamePage />} />
+      </Routes>
     </BrowserRouter>
   );
 }

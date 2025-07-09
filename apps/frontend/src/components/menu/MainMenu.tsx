@@ -15,6 +15,7 @@ import GameLobby from './GameLobby';
 import { useNavigate, useMatch } from 'react-router-dom';
 import SignUpModal from './SignUpModal';
 import KeySignInModal from './KeySignInModal';
+import { socket } from '../../socket';
 
 const MainMenu: React.FC = () => {
   const [menu, setMenu] = useState<'main' | 'play'>('main');
@@ -140,13 +141,26 @@ const MainMenu: React.FC = () => {
               visibility="public"
               allowSpectators={true}
               inviteLink={inviteLink}
-              onStart={() => {}}
+              onStart={() => {
+                console.log('[MainMenu] Marking player as ready for room:', roomId, 'user:', userPubkey);
+                // First ensure the user is registered as a player
+                socket.emit('registerToPlay', { roomId, userId: userPubkey });
+                console.log('[MainMenu] Emitted registerToPlay');
+                // Then mark as ready
+                socket.emit('playerReady', { roomId, userId: userPubkey });
+                console.log('[MainMenu] Emitted playerReady');
+                // Don't navigate here - wait for gameStarted event
+              }}
               onCancel={() => { navigate('/'); }}
               userPubkey={userPubkey || ''}
               userPrivkey={userPrivkey}
               authMethod={authMethod}
-              userProfile={userProfile}
+              userProfile={userProfile ?? undefined}
               initialBuyIn={buyIn}
+              onGameStart={() => {
+                console.log('[MainMenu] Game started, navigating to game page');
+                navigate(`/game/${roomId}`);
+              }}
             />
           );
         }

@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { getPublicKey } from 'nostr-tools';
+import type { UserProfile } from '../../types/profile';
 
 interface SignUpModalProps {
   show: boolean;
   onClose: () => void;
-  publishProfile: (profileForm: any, priv: string, pub: string) => Promise<{ success: boolean; error?: string }>;
+  publishProfile: (profileForm: UserProfile, priv: string, pub: string) => Promise<{ success: boolean; error?: string }>;
 }
 
-const initialProfileForm = {
+const initialProfileForm: UserProfile = {
   name: '',
   display_name: '',
   about: '',
@@ -20,7 +21,7 @@ const initialProfileForm = {
 
 const SignUpModal: React.FC<SignUpModalProps> = ({ show, onClose, publishProfile }) => {
   const [registerStep, setRegisterStep] = useState<'form' | 'showKeys' | 'review' | 'publishing' | 'done'>('form');
-  const [profileForm, setProfileForm] = useState({ ...initialProfileForm });
+  const [profileForm, setProfileForm] = useState<UserProfile>({ ...initialProfileForm });
   const [generatedKeys, setGeneratedKeys] = useState<{ priv: string; pub: string } | null>(null);
   const [publishError, setPublishError] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
@@ -46,7 +47,7 @@ const SignUpModal: React.FC<SignUpModalProps> = ({ show, onClose, publishProfile
 
   const handleRegisterSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!profileForm.name.trim() || !profileForm.image.trim()) {
+    if (!profileForm.name?.trim() || !profileForm.image?.trim()) {
       return;
     }
     // Generate keypair
@@ -85,15 +86,15 @@ const SignUpModal: React.FC<SignUpModalProps> = ({ show, onClose, publishProfile
           <>
             <div className="text-2xl font-bold mb-6">Register</div>
             <form className="flex flex-col gap-3 w-full" onSubmit={handleRegisterSubmit}>
-              <input className="px-3 py-2 rounded border" name="name" placeholder="Name *" value={profileForm.name} onChange={handleProfileFormChange} required style={{ borderColor: !profileForm.name.trim() ? 'red' : undefined }} />
+              <input className="px-3 py-2 rounded border" name="name" placeholder="Name *" value={profileForm.name} onChange={handleProfileFormChange} required style={{ borderColor: !profileForm.name?.trim() ? 'red' : undefined }} />
               <input className="px-3 py-2 rounded border" name="display_name" placeholder="Display Name" value={profileForm.display_name} onChange={handleProfileFormChange} />
               <textarea className="px-3 py-2 rounded border" name="about" placeholder="About" value={profileForm.about} onChange={handleProfileFormChange} />
-              <input className="px-3 py-2 rounded border" name="image" placeholder="Profile Picture URL *" value={profileForm.image} onChange={handleProfileFormChange} required style={{ borderColor: !profileForm.image.trim() ? 'red' : undefined }} />
+              <input className="px-3 py-2 rounded border" name="image" placeholder="Profile Picture URL *" value={profileForm.image} onChange={handleProfileFormChange} required style={{ borderColor: !profileForm.image?.trim() ? 'red' : undefined }} />
               <input className="px-3 py-2 rounded border" name="banner" placeholder="Banner URL" value={profileForm.banner} onChange={handleProfileFormChange} />
               <input className="px-3 py-2 rounded border" name="nip05" placeholder="NIP-05 (e.g. alice@nostr.com)" value={profileForm.nip05} onChange={handleProfileFormChange} />
               <input className="px-3 py-2 rounded border" name="lud16" placeholder="Lightning Address (lud16)" value={profileForm.lud16} onChange={handleProfileFormChange} />
               <input className="px-3 py-2 rounded border" name="website" placeholder="Website" value={profileForm.website} onChange={handleProfileFormChange} />
-              <button type="submit" className="mt-4 px-6 py-2 rounded bg-black text-white hover:bg-gray-900 transition font-bold" disabled={!profileForm.name.trim() || !profileForm.image.trim()}>Generate Keys & Continue</button>
+              <button type="submit" className="mt-4 px-6 py-2 rounded bg-black text-white hover:bg-gray-900 transition font-bold" disabled={!profileForm.name?.trim() || !profileForm.image?.trim()}>Generate Keys & Continue</button>
               <div className="text-xs text-red-600 mt-1">* Name and Profile Picture URL are required</div>
             </form>
           </>
@@ -111,7 +112,7 @@ const SignUpModal: React.FC<SignUpModalProps> = ({ show, onClose, publishProfile
           <>
             <div className="text-2xl font-bold mb-4">Review Profile</div>
             <div className="flex flex-col items-center w-full gap-2 mb-4">
-              <img src={profileForm.image} alt="Profile" className="w-24 h-24 rounded-full object-cover border-2 border-black" />
+              <img src={profileForm.image ?? ''} alt="Profile" className="w-24 h-24 rounded-full object-cover border-2 border-black" />
               <div className="font-bold text-lg">{profileForm.name}</div>
               {profileForm.display_name && <div className="text-gray-700">{profileForm.display_name}</div>}
               {profileForm.about && <div className="text-gray-600 text-center">{profileForm.about}</div>}
@@ -120,6 +121,12 @@ const SignUpModal: React.FC<SignUpModalProps> = ({ show, onClose, publishProfile
               {profileForm.lud16 && <div className="text-xs text-gray-400">Lightning: {profileForm.lud16}</div>}
               {profileForm.website && <div className="text-xs text-blue-600 underline">{profileForm.website}</div>}
             </div>
+            {publishing && (
+              <div className="flex items-center gap-2 text-blue-600 font-semibold mb-2">
+                <span className="animate-spin material-symbols-outlined">autorenew</span>
+                Publishing your profile to Nostr...
+              </div>
+            )}
             <button className="mt-2 px-6 py-2 rounded bg-black text-white hover:bg-gray-900 transition font-bold" onClick={handlePublishProfile} disabled={publishing}>Confirm & Publish to Nostr</button>
             <button className="mt-2 px-6 py-2 rounded bg-gray-200 text-black hover:bg-gray-300 transition font-bold" onClick={() => setRegisterStep('form')}>Edit</button>
             {publishError && <div className="text-red-600 mt-2">{publishError}</div>}

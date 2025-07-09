@@ -2,23 +2,13 @@ import { useState, useEffect, useCallback } from 'react';
 import fetchNostrProfile, { ndk } from './nostrProfile';
 import { nip19, getPublicKey, finalizeEvent } from 'nostr-tools';
 import { NDKEvent } from '@nostr-dev-kit/ndk';
+import type { UserProfile } from '../../types/profile';
 
 const PUBKEY_KEY = 'cdl_pubkey';
 const IMAGE_KEY = 'cdl_image';
 const PROFILE_KEY = 'cdl_profile';
 
 type AuthMethod = 'extension' | 'key' | null;
-
-type ProfileForm = {
-  name: string;
-  display_name: string;
-  about: string;
-  picture: string;
-  nip05: string;
-  lud16: string;
-  website: string;
-  banner: string;
-};
 
 function hexToUint8Array(hex: string): Uint8Array {
   if (hex.length % 2 !== 0) throw new Error('Invalid hex string');
@@ -32,7 +22,7 @@ function hexToUint8Array(hex: string): Uint8Array {
 export default function useNostrAuth() {
   const [userPubkey, setUserPubkey] = useState<string | null>(null);
   const [userPrivkey, setUserPrivkey] = useState<string | null>(null);
-  const [userProfile, setUserProfile] = useState<any>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [userImage, setUserImage] = useState<string | null>(null);
   const [authMethod, setAuthMethod] = useState<AuthMethod>(null);
 
@@ -112,7 +102,7 @@ export default function useNostrAuth() {
     }
   }, []);
 
-  const publishProfile = useCallback(async (profileForm: ProfileForm, priv: string, pub: string) => {
+  const publishProfile = useCallback(async (profileForm: UserProfile, priv: string, pub: string) => {
     try {
       const unsignedEvent = {
         kind: 0,
@@ -129,12 +119,19 @@ export default function useNostrAuth() {
       setAuthMethod('key');
       // Fetch the profile from Nostr to get the image as relays see it
       const fetchedProfile = await fetchNostrProfile(pub);
-      setUserImage(fetchedProfile.image ? profileForm.picture : null);
+      setUserImage((fetchedProfile.image || profileForm.image) ?? null);
       // Merge the form and fetched profile, always set image
+      const fetched: Partial<UserProfile> = fetchedProfile || {};
+      const form: UserProfile = profileForm;
       setUserProfile({
-        ...profileForm,
-        ...fetchedProfile,
-        image: fetchedProfile.image || profileForm.picture,
+        name: fetched.name ?? form.name ?? '',
+        display_name: fetched.display_name ?? form.display_name ?? '',
+        about: fetched.about ?? form.about ?? '',
+        image: fetched.image ?? form.image ?? '',
+        nip05: fetched.nip05 ?? form.nip05 ?? '',
+        lud16: fetched.lud16 ?? form.lud16 ?? '',
+        website: fetched.website ?? form.website ?? '',
+        banner: fetched.banner ?? form.banner ?? '',
       });
       return { success: true };
     } catch (e) {

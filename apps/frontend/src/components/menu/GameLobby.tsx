@@ -11,6 +11,7 @@ interface GameLobbyProps {
   inviteLink: string;
   onStart: () => void;
   onCancel: () => void;
+  onGameStart?: () => void;
   userPubkey: string;
   userPrivkey: string | null;
   authMethod: 'extension' | 'key' | null;
@@ -33,6 +34,7 @@ const GameLobby: React.FC<GameLobbyProps> = ({
   inviteLink,
   onStart,
   onCancel,
+  onGameStart,
   userPubkey,
   userPrivkey,
   authMethod,
@@ -50,6 +52,7 @@ const GameLobby: React.FC<GameLobbyProps> = ({
   // Live room state from backend
   const [playersState, setPlayersState] = useState<{ pubkey: string; name?: string; avatar?: string }[]>([]);
   const [spectatorsState, setSpectatorsState] = useState<{ pubkey: string; name?: string; avatar?: string }[]>([]);
+  const [readyPlayers, setReadyPlayers] = useState<string[]>([]);
 
   // Fetch Nostr profiles for all users
   const allPubkeys = [
@@ -72,10 +75,16 @@ const GameLobby: React.FC<GameLobbyProps> = ({
   const isSpectator = spectatorsState.some(s => s.pubkey === userPubkey);
   const isPlayer = playersState.some(p => p.pubkey === userPubkey);
   const canRegister = isSpectator && playersState.length < 2;
+  const isReady = readyPlayers.includes(userPubkey);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Debug readyPlayers changes
+  useEffect(() => {
+    console.log('[GameLobby] readyPlayers state changed:', readyPlayers);
+  }, [readyPlayers]);
 
   // Socket.IO connection and room logic
   useEffect(() => {
@@ -93,14 +102,30 @@ const GameLobby: React.FC<GameLobbyProps> = ({
       socket.emit('joinRoom', { roomId, user });
     }
     const handleRoomState = (state: any) => {
+      console.log('[GameLobby] Received room state:', state);
       setPlayersState(state.players.map((u: any) => ({ pubkey: u.userId, name: u.name, avatar: u.avatar })));
       setSpectatorsState(state.spectators.map((u: any) => ({ pubkey: u.userId, name: u.name, avatar: u.avatar })));
       if (typeof state.buyIn === 'number') setBuyIn(state.buyIn);
+      if (state.readyPlayers) {
+        console.log('[GameLobby] Setting ready players:', state.readyPlayers);
+        setReadyPlayers(state.readyPlayers);
+      }
     };
     socket.on('roomState', handleRoomState);
+    
+    // Listen for game start
+    const handleGameStart = () => {
+      console.log('[GameLobby] Game started, navigating to game page');
+      if (onGameStart) {
+        onGameStart(); // Call the parent's onGameStart function
+      }
+    };
+    socket.on('gameStarted', handleGameStart);
+    
     return () => {
       socket.emit('leaveRoom', { roomId, userId: userPubkey });
       socket.off('roomState', handleRoomState);
+      socket.off('gameStarted', handleGameStart);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userPubkey, inviteLink, initialBuyIn]);
@@ -167,10 +192,12 @@ const GameLobby: React.FC<GameLobbyProps> = ({
           <ul className="pl-4 flex flex-col gap-1">
             {playersState.map(p => {
               const profile = profiles[p.pubkey];
+              const isReady = readyPlayers.includes(p.pubkey);
               return (
                 <li key={p.pubkey} className={p.pubkey === userPubkey ? 'font-bold text-blue-700 flex items-center gap-2' : 'flex items-center gap-2'}>
                   {profile?.image && <img src={profile.image} alt="avatar" className="w-6 h-6 rounded-full object-cover border" />}
                   {profile?.name || p.name || p.pubkey.slice(0, 8)}{p.pubkey === userPubkey ? ' (You)' : ''}
+                  {isReady && <span className="text-green-600 text-xs font-bold">✓ Ready</span>}
                 </li>
               );
             })}
@@ -235,7 +262,37 @@ const GameLobby: React.FC<GameLobbyProps> = ({
         </div>
         <div className="flex w-full gap-2 mt-2">
           <button className="flex-1 py-2 rounded bg-gray-200 text-black font-semibold" onClick={onCancel}>Cancel</button>
-          <button className="flex-1 py-2 rounded bg-black text-white font-bold" onClick={onStart}>Start Game</button>
+          <button 
+            className={`flex-1 py-2 rounded font-bold ${
+              isReady
+                ? 'bg-green-600 text-white'
+                : playersState.length >= 2
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-400 text-gray-600'
+            }`} 
+            onClick={onStart}
+            disabled={playersState.length < 2}
+          >
+            {playersState.length < 2 
+              ? 'Waiting for players...' 
+              : isReady
+                ? '✓ Ready'
+                : 'Click to Ready'
+            }
+          </button>
+        </div>
+        {/* Status message */}
+        {playersState.length >= 2 && (
+          <div className="text-sm text-center mt-2">
+            {readyPlayers.length === playersState.length 
+              ? '🎮 Game will start automatically!'
+              : `Waiting for ${playersState.length - readyPlayers.length} more player${playersState.length - readyPlayers.length === 1 ? '' : 's'} to be ready...`
+            }
+          </div>
+        )}
+        {/* Debug info */}
+        <div className="text-xs text-gray-500 mt-2">
+          Debug: Players: {playersState.length}, Ready: {readyPlayers.length}, Ready IDs: {readyPlayers.join(', ')}
         </div>
       </div>
     </div>
