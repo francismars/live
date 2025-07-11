@@ -43,6 +43,28 @@ const pendingPayments: Record<string, { roomId: string; userId: string }> = {};
 // In-memory store for lobbies: { roomId: { players: Array<{ pubkey: string; name: string }> } }
 const lobbies: { [roomId: string]: { players: Array<{ pubkey: string; name: string }> } } = {};
 
+// --- Matchmaking Queue ---
+interface MatchmakingRequest {
+  socket: any;
+  userId: string;
+  name?: string;
+  avatar?: string;
+  gameType: 'normal' | 'ranked';
+  buyIn: number;
+  allowSpectators: boolean;
+}
+const matchmakingQueue: MatchmakingRequest[] = [];
+
+function findCompatibleMatch(request: MatchmakingRequest) {
+  return matchmakingQueue.find(
+    (other) =>
+      other !== request &&
+      other.gameType === request.gameType &&
+      other.buyIn === request.buyIn &&
+      other.allowSpectators === request.allowSpectators
+  );
+}
+
 function emitRoomState(roomId: string) {
   const room = rooms.get(roomId);
   if (room) {
@@ -59,46 +81,56 @@ function emitRoomState(roomId: string) {
   }
 }
 
+// --- Game Intervals ---
+const gameIntervals = new Map(); // roomId -> { interval, broadcastInterval }
+
 function startGameForRoom(roomId: string) {
   const room = rooms.get(roomId);
   if (!room || room.players.length === 0) {
     console.log(`[startGameForRoom] No room or no players found for roomId: ${roomId}`);
     return;
   }
-  
   const players: Array<{ pubkey: string; name: string; buyIn?: number }> = room.players.map(p => ({ 
     pubkey: p.userId, 
     name: p.name || p.userId.slice(0, 8),
     buyIn: room.buyIn || 1000 // Use room buyIn or default to 1000
   }));
-  
   console.log(`[startGameForRoom] Starting game for room ${roomId} with players:`, players);
   snakeGame.initGame(roomId, players);
   console.log(`[startGameForRoom] Game initialized. Initial state:`, snakeGame.getGameState(roomId));
-  
-  if (!snakeGame.games[roomId].interval && !snakeGame.games[roomId].broadcastInterval) {
-    console.log(`[startGameForRoom] Starting game loop for room ${roomId}`);
-    // Emit game started event
-    io.to(roomId).emit('gameStarted');
-    // Game logic tick
-    snakeGame.games[roomId].interval = setInterval(() => {
-      snakeGame.gameTick(roomId);
-      const state = snakeGame.getGameState(roomId);
-      if (state && state.status === 'ended') {
-        console.log(`[startGameForRoom] Game ended, clearing intervals for room ${roomId}`);
-        clearInterval(snakeGame.games[roomId].interval);
-        clearInterval(snakeGame.games[roomId].broadcastInterval);
-      }
-    }, TICK_RATE);
-    // Broadcast state to clients at 16ms (about 60 FPS)
-    snakeGame.games[roomId].broadcastInterval = setInterval(() => {
-      const state = snakeGame.getGameState(roomId);
-      io.to(roomId).emit('gameState', state);
-    }, 16);
-  } else {
-    console.log(`[startGameForRoom] Game loop already running for room ${roomId}`);
+
+  if (gameIntervals.has(roomId)) {
+    console.warn(`[startGameForRoom] Attempted to start game loop for ${roomId}, but intervals already exist.`);
+    return;
   }
+  // Now safe to create intervals
+  console.log(`[startGameForRoom] Starting game loop for room ${roomId}`);
+  io.to(roomId).emit('gameStarted');
+  const interval = setInterval(() => {
+    snakeGame.gameTick(roomId);
+    const state = snakeGame.getGameState(roomId);
+    console.log(`[TICK] ${roomId} status=${state?.status} sats=${state?.players?.map(p => p.sats).join(',')} time=${Date.now()}`);
+    if (state && state.status === 'ended') {
+      console.log(`[startGameForRoom] Game ended, clearing intervals for room ${roomId}`);
+      const intervals = gameIntervals.get(roomId);
+      if (intervals) {
+        clearInterval(intervals.interval);
+        clearInterval(intervals.broadcastInterval);
+        gameIntervals.delete(roomId);
+      }
+      delete snakeGame.games[roomId];
+    }
+  }, TICK_RATE);
+  const broadcastInterval = setInterval(() => {
+    const state = snakeGame.getGameState(roomId);
+    console.log(`[BROADCAST] ${roomId} sats=${state?.players?.map(p => p.sats).join(',')} time=${Date.now()}`);
+    io.to(roomId).emit('gameState', state);
+  }, 16);
+  gameIntervals.set(roomId, { interval, broadcastInterval });
 }
+
+// --- Matchmaking Accept State ---
+const matchmakingAccepts: Record<string, Set<string>> = {};
 
 io.on('connection', (socket) => {
   console.log('A user connected:', socket.id);
@@ -238,6 +270,90 @@ io.on('connection', (socket) => {
     io.to(roomId).emit('lobbyChat', { sender, text });
   });
 
+  // --- Matchmaking ---
+  socket.on('findMatch', (data) => {
+    const { userId, name, avatar, gameType, buyIn, allowSpectators } = data;
+    // Check if already in queue
+    if (matchmakingQueue.some((req) => req.userId === userId)) {
+      socket.emit('matchmakingStatus', { status: 'error', message: 'Already in matchmaking queue.' });
+      return;
+    }
+    const request: MatchmakingRequest = {
+      socket,
+      userId,
+      name,
+      avatar,
+      gameType,
+      buyIn,
+      allowSpectators,
+    };
+    // Try to find a compatible match
+    const match = findCompatibleMatch(request);
+    if (match) {
+      // Remove both from queue
+      matchmakingQueue.splice(matchmakingQueue.indexOf(match), 1);
+      // Generate a roomId
+      const roomId = generateLobbyId();
+      // Create room and add both players
+      const room = {
+        roomId,
+        players: [
+          { userId: request.userId, name: request.name, avatar: request.avatar, socketId: socket.id },
+          { userId: match.userId, name: match.name, avatar: match.avatar, socketId: match.socket.id },
+        ],
+        spectators: [],
+        buyIn: request.buyIn,
+        settings: { gameType: request.gameType, allowSpectators: request.allowSpectators },
+        readyPlayers: new Set<string>(),
+      };
+      rooms.set(roomId, room);
+      // Track accept state for this room
+      matchmakingAccepts[roomId] = new Set();
+      // Notify both clients
+      socket.emit('matchFound', { roomId });
+      match.socket.emit('matchFound', { roomId });
+      // Auto-join both players to the room as spectators (they must register to play)
+      socket.join(roomId);
+      match.socket.join(roomId);
+      // Do NOT emitRoomState here (no lobby for matchmaking)
+    } else {
+      matchmakingQueue.push(request);
+      socket.emit('matchmakingStatus', { status: 'waiting' });
+    }
+  });
+
+  // --- Accept Match for Matchmaking ---
+  socket.on('acceptMatch', ({ roomId, userId }) => {
+    if (!roomId || !userId) return;
+    if (!matchmakingAccepts[roomId]) return;
+    matchmakingAccepts[roomId].add(userId);
+    // If both players have accepted, start the game
+    const room = rooms.get(roomId);
+    if (room && matchmakingAccepts[roomId].size === 2) {
+      // Move both users from spectators to players
+      for (const user of room.spectators) {
+        room.players.push(user);
+      }
+      room.spectators = [];
+      // Mark both as ready
+      for (const player of room.players) {
+        room.readyPlayers.add(player.userId);
+      }
+      // Start the game directly
+      startGameForRoom(roomId);
+      // Clean up accept state
+      delete matchmakingAccepts[roomId];
+    }
+  });
+
+  socket.on('cancelMatchmaking', ({ userId }) => {
+    const idx = matchmakingQueue.findIndex((req) => req.userId === userId);
+    if (idx !== -1) {
+      matchmakingQueue.splice(idx, 1);
+      socket.emit('matchmakingStatus', { status: 'cancelled' });
+    }
+  });
+
   socket.on('disconnect', () => {
     // Optionally handle player leaving
     // Remove user from all rooms
@@ -318,6 +434,16 @@ app.post('/api/lnbits-webhook', express.json(), (req, res) => {
   console.error('[LNbits Webhook] Invalid or unpaid payment_hash:', payment_hash);
   res.status(400).json({ error: 'Invalid or unpaid payment_hash' });
 });
+
+// Helper to generate a user-friendly 8-character lobby code (A-Z, 2-9, no O/0/I/1)
+function generateLobbyId(length = 8) {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let id = '';
+  for (let i = 0; i < length; i++) {
+    id += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return id;
+}
 
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {

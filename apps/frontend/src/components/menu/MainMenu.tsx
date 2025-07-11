@@ -44,6 +44,10 @@ const MainMenu: React.FC = () => {
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
   const [inLobby, setInLobby] = useState(false);
   const [gameStarted, setGameStarted] = useState(false);
+  const [matchmakingStatus, setMatchmakingStatus] = useState<'idle' | 'waiting' | 'error' | 'found'>('idle');
+  const [matchmakingError, setMatchmakingError] = useState<string | null>(null);
+  const [pendingMatchRoomId, setPendingMatchRoomId] = useState<string | null>(null);
+  const [hasAcceptedMatch, setHasAcceptedMatch] = useState(false);
 
   const {
     userPubkey,
@@ -114,6 +118,47 @@ const MainMenu: React.FC = () => {
       socket.off('gameStarted', handleGameStarted);
     };
   }, [activeRoomId, inLobby]);
+
+  React.useEffect(() => {
+    function handleMatchmakingStatus(data: { status: string; message?: string }) {
+      if (data.status === 'waiting') {
+        setMatchmakingStatus('waiting');
+        setMatchmakingError(null);
+      } else if (data.status === 'error') {
+        setMatchmakingStatus('error');
+        setMatchmakingError(data.message || 'Matchmaking error');
+      } else if (data.status === 'cancelled') {
+        setMatchmakingStatus('idle');
+        setMatchmakingError(null);
+      }
+    }
+    function handleMatchFound(data: { roomId: string }) {
+      setMatchmakingStatus('found');
+      setPendingMatchRoomId(data.roomId);
+      setHasAcceptedMatch(false);
+      // Do NOT setActiveRoomId or setInLobby yet
+    }
+    function handleGameStarted() {
+      if (pendingMatchRoomId) {
+        setActiveRoomId(pendingMatchRoomId);
+        setPendingMatchRoomId(null);
+        setHasAcceptedMatch(false);
+        setInLobby(false);
+        setGameStarted(true);
+      } else {
+        setGameStarted(true);
+        setInLobby(false);
+      }
+    }
+    socket.on('matchmakingStatus', handleMatchmakingStatus);
+    socket.on('matchFound', handleMatchFound);
+    socket.on('gameStarted', handleGameStarted);
+    return () => {
+      socket.off('matchmakingStatus', handleMatchmakingStatus);
+      socket.off('matchFound', handleMatchFound);
+      socket.off('gameStarted', handleGameStarted);
+    };
+  }, [pendingMatchRoomId]);
 
   // When leaving lobby/game, navigate to main menu
   const handleLeaveLobby = () => {
@@ -201,7 +246,67 @@ const MainMenu: React.FC = () => {
               setInLobby(true);
               setGameStarted(false);
             }}
+            onFindMatch={prefs => {
+              if (!userPubkey) {
+                setMatchmakingStatus('error');
+                setMatchmakingError('You must be signed in to find a match.');
+                return;
+              }
+              setMatchmakingStatus('waiting');
+              setMatchmakingError(null);
+              socket.emit('findMatch', {
+                userId: userPubkey,
+                name: userProfile?.name,
+                avatar: userProfile?.image,
+                gameType: prefs.gameType,
+                buyIn: prefs.buyIn,
+                allowSpectators: prefs.allowSpectators,
+              });
+            }}
           />
+          {/* Show matchmaking status */}
+          {matchmakingStatus === 'waiting' && (
+            <div className="fixed top-0 left-0 w-full h-full flex items-center justify-center bg-black bg-opacity-60 z-50">
+              <div className="bg-white text-black rounded-2xl shadow-2xl px-8 py-6 flex flex-col gap-4 items-center min-w-[300px] relative">
+                <div className="text-xl font-bold mb-2">Finding a Match...</div>
+                <div className="text-gray-600">Waiting for another player with similar preferences.</div>
+                <button className="mt-4 px-4 py-2 rounded bg-gray-300 text-black font-bold" onClick={() => {
+                  setMatchmakingStatus('idle');
+                  setMatchmakingError(null);
+                  socket.emit('cancelMatchmaking', { userId: userPubkey });
+                }}>Cancel</button>
+              </div>
+            </div>
+          )}
+          {matchmakingStatus === 'error' && (
+            <div className="fixed top-0 left-0 w-full h-full flex items-center justify-center bg-black bg-opacity-60 z-50">
+              <div className="bg-white text-black rounded-2xl shadow-2xl px-8 py-6 flex flex-col gap-4 items-center min-w-[300px] relative">
+                <div className="text-xl font-bold mb-2 text-red-600">Matchmaking Error</div>
+                <div className="text-gray-600">{matchmakingError}</div>
+                <button className="mt-4 px-4 py-2 rounded bg-gray-300 text-black font-bold" onClick={() => setMatchmakingStatus('idle')}>Close</button>
+              </div>
+            </div>
+          )}
+          {matchmakingStatus === 'found' && pendingMatchRoomId && (
+            <div className="fixed top-0 left-0 w-full h-full flex items-center justify-center bg-black bg-opacity-60 z-50">
+              <div className="bg-white text-black rounded-2xl shadow-2xl px-8 py-6 flex flex-col gap-4 items-center min-w-[300px] relative">
+                <div className="text-xl font-bold mb-2">Match Found!</div>
+                <div className="text-gray-600">Press Accept to start. Waiting for both players to accept.</div>
+                <button
+                  className={`mt-4 px-4 py-2 rounded font-bold ${hasAcceptedMatch ? 'bg-green-600 text-white' : 'bg-black text-white'}`}
+                  disabled={hasAcceptedMatch}
+                  onClick={() => {
+                    if (pendingMatchRoomId && userPubkey) {
+                      socket.emit('acceptMatch', { roomId: pendingMatchRoomId, userId: userPubkey });
+                      setHasAcceptedMatch(true);
+                    }
+                  }}
+                >
+                  {hasAcceptedMatch ? 'Waiting for opponent...' : 'Accept'}
+                </button>
+              </div>
+            </div>
+          )}
           <CreateMatchMenu
             show={showCreateMatch}
             onBack={() => setShowCreateMatch(false)}

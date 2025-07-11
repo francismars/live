@@ -5,20 +5,20 @@ interface CreateMatchMenuProps {
   show: boolean;
   onBack: () => void;
   onCreate: (options: {
-    gameType: 'normal' | 'ranked';
+    gameType: 'normal';
     stake: string;
     timeLimit: string;
-    visibility: 'public' | 'private';
     allowSpectators: boolean;
   }) => void;
 }
 
 const CreateMatchMenu: React.FC<CreateMatchMenuProps> = ({ show, onBack, onCreate }) => {
   const isVisible = useAnimatedPresence(show);
-  const [gameType, setGameType] = useState<'normal' | 'ranked'>('normal');
+  const [gameType, setGameType] = useState<'normal'>('normal');
   const [stake, setStake] = useState('');
   const [timeLimit, setTimeLimit] = useState('5');
-  const [visibility, setVisibility] = useState<'public' | 'private'>('private');
+  // Remove visibility state
+  // const [visibility, setVisibility] = useState<'public' | 'private'>('private');
   const [allowSpectators, setAllowSpectators] = useState(true);
 
   if (!isVisible) return null;
@@ -29,49 +29,38 @@ const CreateMatchMenu: React.FC<CreateMatchMenuProps> = ({ show, onBack, onCreat
           <span className="material-symbols-outlined">arrow_back</span>
         </button>
         <div className="text-2xl font-bold mb-6">Create Match</div>
-        <div className="w-full flex flex-col gap-4">
-          <div>
-            <div className="mb-1 font-semibold">Game Type:</div>
-            <div className="flex gap-3">
-              <button onClick={() => setGameType('normal')} className={`px-4 py-2 rounded-full font-semibold border ${gameType === 'normal' ? 'bg-black text-white' : 'bg-gray-100 text-black'} transition`}>Normal</button>
-              <button onClick={() => setGameType('ranked')} className={`px-4 py-2 rounded-full font-semibold border ${gameType === 'ranked' ? 'bg-black text-white' : 'bg-gray-100 text-black'} transition`}>Ranked</button>
-            </div>
-          </div>
-          <div>
-            <div className="mb-1 font-semibold">Stake Amount (sats):</div>
-            <input type="number" min="0" value={stake} onChange={e => setStake(e.target.value)} className="w-full px-3 py-2 rounded border bg-gray-50 focus:outline-none focus:ring-2 focus:ring-black" placeholder="0" />
-          </div>
-          <div>
-            <div className="mb-1 font-semibold">Time Limit (minutes):</div>
-            <input type="number" min="1" value={timeLimit} onChange={e => setTimeLimit(e.target.value)} className="w-full px-3 py-2 rounded border bg-gray-50 focus:outline-none focus:ring-2 focus:ring-black" />
-          </div>
-          <div>
-            <div className="mb-1 font-semibold">Visibility:</div>
-            <div className="flex gap-3">
-              <button onClick={() => setVisibility('private')} className={`px-4 py-2 rounded-full font-semibold border ${visibility === 'private' ? 'bg-black text-white' : 'bg-gray-100 text-black'} transition`}>Private</button>
-              <button onClick={() => setVisibility('public')} className={`px-4 py-2 rounded-full font-semibold border ${visibility === 'public' ? 'bg-black text-white' : 'bg-gray-100 text-black'} transition`}>Public</button>
-            </div>
-          </div>
-          <div>
-            <label className="flex items-center gap-2 font-semibold">
-              <input
-                type="checkbox"
-                checked={allowSpectators}
-                onChange={e => setAllowSpectators(e.target.checked)}
-                className="accent-black"
-              />
-              Allow Spectators
-            </label>
+        <div>
+          <div className="mb-1 font-semibold">Game Type:</div>
+          <div className="flex gap-3">
+            <button className="px-4 py-2 rounded-full font-semibold border bg-black text-white transition" disabled>Normal</button>
           </div>
         </div>
+        <div>
+          <div className="mb-1 font-semibold">Stake Amount (sats):</div>
+          <input type="number" min="0" value={stake} onChange={e => setStake(e.target.value)} className="w-full px-3 py-2 rounded border bg-gray-50 focus:outline-none focus:ring-2 focus:ring-black" placeholder="0" />
+        </div>
+        <div>
+          <div className="mb-1 font-semibold">Time Limit (minutes):</div>
+          <input type="number" min="1" value={timeLimit} onChange={e => setTimeLimit(e.target.value)} className="w-full px-3 py-2 rounded border bg-gray-50 focus:outline-none focus:ring-2 focus:ring-black" />
+        </div>
+        {/* Remove visibility option */}
+        <label className="flex items-center gap-2 font-semibold">
+          <input
+            type="checkbox"
+            checked={allowSpectators}
+            onChange={e => setAllowSpectators(e.target.checked)}
+            className="accent-black"
+          />
+          Allow Spectators
+        </label>
         <button
           className="mt-8 w-full py-3 rounded-full bg-black text-white font-bold text-lg hover:bg-gray-900 transition"
           onClick={() => {
             onCreate({
-              gameType,
+              gameType: 'normal',
               stake,
               timeLimit,
-              visibility,
+              // visibility: visibility, // removed
               allowSpectators,
             });
           }}
