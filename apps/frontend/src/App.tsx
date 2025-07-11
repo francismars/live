@@ -8,8 +8,6 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<MainMenu />} />
-        <Route path="/join/:roomId" element={<MainMenu />} />
-        <Route path="/game/:roomId" element={<GamePage />} />
       </Routes>
     </BrowserRouter>
   );

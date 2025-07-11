@@ -12,7 +12,7 @@ import useNostrAuth from '../shared/useNostrAuth';
 import ChatPanel from '../chat/ChatPanel';
 import { getPublicKey, nip19 } from 'nostr-tools';
 import GameLobby from './GameLobby';
-import { useNavigate, useMatch } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import SignUpModal from './SignUpModal';
 import KeySignInModal from './KeySignInModal';
 import { socket } from '../../socket';
@@ -44,7 +44,6 @@ const MainMenu: React.FC = () => {
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
   const [inLobby, setInLobby] = useState(false);
   const [gameStarted, setGameStarted] = useState(false);
-  const matchJoin = useMatch('/join/:roomId');
 
   const {
     userPubkey,
@@ -116,15 +115,6 @@ const MainMenu: React.FC = () => {
     };
   }, [activeRoomId, inLobby]);
 
-  // Sync state with /join/:roomId route
-  React.useEffect(() => {
-    if (matchJoin && matchJoin.params.roomId) {
-      setActiveRoomId(matchJoin.params.roomId);
-      setInLobby(true);
-      setGameStarted(false);
-    }
-  }, [matchJoin]);
-
   // When leaving lobby/game, navigate to main menu
   const handleLeaveLobby = () => {
     setActiveRoomId(null);
@@ -137,6 +127,16 @@ const MainMenu: React.FC = () => {
     setGameStarted(false);
     navigate('/');
   };
+
+  // Helper to generate an 8-character lobby code (A-Z, 2-9, no O/0/I/1)
+  function generateLobbyId(length = 8) {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let id = '';
+    for (let i = 0; i < length; i++) {
+      id += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return id;
+  }
 
   return (
     <div className="w-screen h-screen bg-black text-white font-mono flex flex-col justify-between relative overflow-hidden">
@@ -192,14 +192,23 @@ const MainMenu: React.FC = () => {
       {!activeRoomId && !inLobby && !gameStarted && (
         <>
           <MainMenuOptions onPlay={handlePlay} hide={hideMain || menu === 'play'} />
-          <PlayMenuOptions show={menu === 'play' && !hidePlay} onBack={handleBack} onCreateMatch={() => setShowCreateMatch(true)} />
+          <PlayMenuOptions
+            show={menu === 'play' && !hidePlay}
+            onBack={handleBack}
+            onCreateMatch={() => setShowCreateMatch(true)}
+            onJoinGame={code => {
+              setActiveRoomId(code);
+              setInLobby(true);
+              setGameStarted(false);
+            }}
+          />
           <CreateMatchMenu
             show={showCreateMatch}
             onBack={() => setShowCreateMatch(false)}
             onCreate={opts => {
               setShowCreateMatch(false);
-              // Generate a unique roomId (browser-safe)
-              const roomId = (window.crypto && window.crypto.randomUUID) ? window.crypto.randomUUID() : Math.random().toString(36).slice(2, 10);
+              // Generate a user-friendly 8-character lobby code
+              const roomId = generateLobbyId();
               setLobbyOptions({ ...opts, roomId });
               setShowLobby(true);
               setActiveRoomId(roomId);

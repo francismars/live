@@ -245,8 +245,8 @@ const GameLobby: React.FC<GameLobbyProps> = ({
           </ul>
         </div>
         <div className="w-full flex items-center gap-2 mb-4">
-          <input type="text" readOnly value={inviteLink} className="flex-1 px-2 py-1 rounded border text-xs bg-gray-100" />
-          <button className="px-2 py-1 rounded bg-black text-white text-xs font-semibold" onClick={() => {navigator.clipboard.writeText(inviteLink)}}>Copy</button>
+          <input type="text" readOnly value={getRoomIdFromInvite(inviteLink)} className="flex-1 px-2 py-1 rounded border text-xs bg-gray-100" />
+          <button className="px-2 py-1 rounded bg-black text-white text-xs font-semibold" onClick={() => {navigator.clipboard.writeText(getRoomIdFromInvite(inviteLink))}}>Copy</button>
         </div>
         {/* Custom minimal chat UI */}
         <div className="w-full mb-4 flex flex-col">
@@ -304,10 +304,6 @@ const GameLobby: React.FC<GameLobbyProps> = ({
             }
           </div>
         )}
-        {/* Debug info */}
-        <div className="text-xs text-gray-500 mt-2">
-          Debug: Players: {playersState.length}, Ready: {readyPlayers.length}, Ready IDs: {readyPlayers.join(', ')}
-        </div>
       </div>
     </div>
   );

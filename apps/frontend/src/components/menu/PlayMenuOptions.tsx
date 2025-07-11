@@ -1,14 +1,21 @@
 import React, { useState } from 'react';
 import useAnimatedPresence from '../shared/useAnimatedPresence';
-import { useNavigate } from 'react-router-dom';
+// No navigate import needed
 
-const PlayMenuOptions: React.FC<{ show: boolean; onBack: () => void; onCreateMatch: () => void }> = ({ show, onBack, onCreateMatch }) => {
+interface PlayMenuOptionsProps {
+  show: boolean;
+  onBack: () => void;
+  onCreateMatch: () => void;
+  onJoinGame: (roomId: string) => void;
+}
+
+const PlayMenuOptions: React.FC<PlayMenuOptionsProps> = ({ show, onBack, onCreateMatch, onJoinGame }) => {
   const isVisible = useAnimatedPresence(show);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [roomCode, setRoomCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
+  // const navigate = useNavigate(); // Removed as per edit hint
 
   if (!isVisible) return null;
 
@@ -29,11 +36,12 @@ const PlayMenuOptions: React.FC<{ show: boolean; onBack: () => void; onCreateMat
     e.preventDefault();
     setLoading(true);
     setError('');
-    // Simulate a short delay for UX
     setTimeout(() => {
       setLoading(false);
       setShowJoinModal(false);
-      navigate(`/join/${roomCode}`);
+      if (roomCode) {
+        onJoinGame(roomCode);
+      }
     }, 300);
   };
 
