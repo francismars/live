@@ -88,7 +88,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ onClose, userPubkey, userPrivkey,
   };
 
   return (
-    <div className="absolute bottom-28 right-12 w-80 bg-white text-black rounded-xl shadow-2xl p-4 z-30 flex flex-col">
+    <div className="w-80 bg-white text-black rounded-xl shadow-2xl p-4 z-30 flex flex-col">
       <div className="flex justify-between items-center mb-2">
         <span className="font-bold">Global Chat</span>
         <button onClick={onClose} className="text-gray-500 hover:text-black text-2xl leading-none">&times;</button>

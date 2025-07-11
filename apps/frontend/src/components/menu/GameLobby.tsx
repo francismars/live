@@ -122,10 +122,17 @@ const GameLobby: React.FC<GameLobbyProps> = ({
     };
     socket.on('gameStarted', handleGameStart);
     
+    // Listen for lobbyChat messages
+    const handleLobbyChat = (msg: { sender: string; text: string }) => {
+      setMessages(prev => [...prev, msg]);
+    };
+    socket.on('lobbyChat', handleLobbyChat);
+
     return () => {
       socket.emit('leaveRoom', { roomId, userId: userPubkey });
       socket.off('roomState', handleRoomState);
       socket.off('gameStarted', handleGameStart);
+      socket.off('lobbyChat', handleLobbyChat);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userPubkey, inviteLink, initialBuyIn]);
@@ -147,7 +154,8 @@ const GameLobby: React.FC<GameLobbyProps> = ({
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim()) return;
-    setMessages(prev => [...prev, { sender: userPubkey.slice(0, 8), text: input }]);
+    const roomId = getRoomIdFromInvite(inviteLink);
+    socket.emit('lobbyChat', { roomId, sender: userPubkey, text: input });
     setInput('');
   };
 
@@ -245,9 +253,15 @@ const GameLobby: React.FC<GameLobbyProps> = ({
           <div className="font-semibold text-sm mb-1">Lobby Chat</div>
           <div className="h-32 overflow-y-auto bg-gray-50 rounded border p-2 text-sm mb-2" style={{ minHeight: 80 }}>
             {messages.length === 0 && <div className="text-gray-400 text-xs">No messages yet.</div>}
-            {messages.map((msg, i) => (
-              <div key={i} className="mb-1"><span className="font-bold text-xs text-gray-600">{msg.sender}:</span> {msg.text}</div>
-            ))}
+            {messages.map((msg, i) => {
+              const profile = profiles[msg.sender];
+              return (
+                <div key={i} className="mb-1 flex items-center gap-2">
+                  {profile?.image && <img src={profile.image} alt="avatar" className="w-5 h-5 rounded-full object-cover border" />}
+                  <span className="font-bold text-xs text-gray-600">{profile?.name || msg.sender.slice(0, 8)}:</span> {msg.text}
+                </div>
+              );
+            })}
             <div ref={messagesEndRef} />
           </div>
           <form onSubmit={handleSend} className="flex gap-2">

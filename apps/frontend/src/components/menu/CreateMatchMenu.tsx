@@ -38,7 +38,7 @@ const CreateMatchMenu: React.FC<CreateMatchMenuProps> = ({ show, onBack, onCreat
             </div>
           </div>
           <div>
-            <div className="mb-1 font-semibold">Stake Amount (sats or tokens):</div>
+            <div className="mb-1 font-semibold">Stake Amount (sats):</div>
             <input type="number" min="0" value={stake} onChange={e => setStake(e.target.value)} className="w-full px-3 py-2 rounded border bg-gray-50 focus:outline-none focus:ring-2 focus:ring-black" placeholder="0" />
           </div>
           <div>

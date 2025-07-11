@@ -225,6 +225,11 @@ io.on('connection', (socket) => {
     snakeGame.handleInput(roomId, pubkey, direction);
   });
 
+  socket.on('lobbyChat', ({ roomId, sender, text }) => {
+    if (!roomId || !sender || !text) return;
+    io.to(roomId).emit('lobbyChat', { sender, text });
+  });
+
   socket.on('disconnect', () => {
     // Optionally handle player leaving
     // Remove user from all rooms

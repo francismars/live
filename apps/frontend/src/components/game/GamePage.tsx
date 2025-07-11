@@ -1,12 +1,15 @@
 import React, { useEffect, useState, useRef } from 'react';
 import SnakeGame from './SnakeGame';
-import { useParams } from 'react-router-dom';
 import useNostrAuth from '../shared/useNostrAuth';
 import useNostrProfiles from '../shared/useNostrProfiles';
 import { socket } from '../../socket';
 
-const GamePage: React.FC = () => {
-  const { roomId } = useParams();
+interface GamePageProps {
+  roomId: string;
+  onLeaveGame: () => void;
+}
+
+const GamePage: React.FC<GamePageProps> = ({ roomId, onLeaveGame }) => {
   const [gameState, setGameState] = useState<any>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
   const { userPubkey } = useNostrAuth();
@@ -78,7 +81,7 @@ const GamePage: React.FC = () => {
   }, [countdown, roomId]);
 
   return (
-    <div className="w-screen h-screen bg-black text-white font-mono flex flex-col justify-between relative overflow-hidden">
+    <div className="w-full min-h-[600px] bg-black text-white font-mono flex flex-col justify-between relative overflow-hidden">
       {/* Top bar UI inspired by screenshot */}
       <div className="flex justify-between items-center w-full px-12 pt-8 relative">
         <div className="flex flex-col items-start">
@@ -162,6 +165,14 @@ const GamePage: React.FC = () => {
         <div>SIZE 1.57 Mb</div>
         <div>TX COUNT 3687</div>
         <div>MEDIAN FEE 4 sat/vb</div>
+      </div>
+      <div className="flex justify-center py-4">
+        <button
+          className="px-6 py-2 rounded bg-red-600 text-white font-bold hover:bg-red-700 transition"
+          onClick={onLeaveGame}
+        >
+          Leave Game
+        </button>
       </div>
     </div>
   );
