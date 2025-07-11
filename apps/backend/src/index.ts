@@ -4,6 +4,8 @@ import { Server as SocketIOServer } from 'socket.io';
 import dotenv from 'dotenv';
 import axios from 'axios';
 import * as snakeGame from './game/snakeGame';
+// Import TICK_RATE as a named export from snakeGame
+import { TICK_RATE } from './game/snakeGame';
 dotenv.config();
 
 const app = express();
@@ -74,19 +76,25 @@ function startGameForRoom(roomId: string) {
   snakeGame.initGame(roomId, players);
   console.log(`[startGameForRoom] Game initialized. Initial state:`, snakeGame.getGameState(roomId));
   
-  if (!snakeGame.games[roomId].interval) {
+  if (!snakeGame.games[roomId].interval && !snakeGame.games[roomId].broadcastInterval) {
     console.log(`[startGameForRoom] Starting game loop for room ${roomId}`);
     // Emit game started event
     io.to(roomId).emit('gameStarted');
+    // Game logic tick
     snakeGame.games[roomId].interval = setInterval(() => {
       snakeGame.gameTick(roomId);
       const state = snakeGame.getGameState(roomId);
-      io.to(roomId).emit('gameState', state);
       if (state && state.status === 'ended') {
-        console.log(`[startGameForRoom] Game ended, clearing interval for room ${roomId}`);
+        console.log(`[startGameForRoom] Game ended, clearing intervals for room ${roomId}`);
         clearInterval(snakeGame.games[roomId].interval);
+        clearInterval(snakeGame.games[roomId].broadcastInterval);
       }
-    }, 100);
+    }, TICK_RATE);
+    // Broadcast state to clients at 16ms (about 60 FPS)
+    snakeGame.games[roomId].broadcastInterval = setInterval(() => {
+      const state = snakeGame.getGameState(roomId);
+      io.to(roomId).emit('gameState', state);
+    }, 16);
   } else {
     console.log(`[startGameForRoom] Game loop already running for room ${roomId}`);
   }

@@ -83,8 +83,9 @@ const GamePage: React.FC<GamePageProps> = ({ roomId, onLeaveGame }) => {
   return (
     <div className="w-full min-h-[600px] bg-black text-white font-mono flex flex-col justify-between relative overflow-hidden">
       {/* Top bar UI inspired by screenshot */}
-      <div className="flex justify-between items-center w-full px-12 pt-8 relative">
-        <div className="flex flex-col items-start">
+      <div className="flex items-center w-full px-12 pt-8 gap-6">
+        {/* Left player info */}
+        <div className="flex flex-col items-start min-w-[120px]">
           <div className="font-bold text-2xl flex items-center gap-2">
             {gameState?.players?.[0] && (
               <>
@@ -103,11 +104,15 @@ const GamePage: React.FC<GamePageProps> = ({ roomId, onLeaveGame }) => {
           </div>
           <div className="text-xs font-bold mt-1">
             {gameState?.players?.[0]?.sats || 0} sats
+            {typeof gameState?.players?.[0]?.capturePercent === 'number' && (
+              <span className="ml-2 text-green-400">+{gameState.players[0].capturePercent}%</span>
+            )}
           </div>
         </div>
-        <div className="text-center">
-          <div className="text-xs mb-1">INITIAL DISTRIBUTION</div>
-          <div className="w-32 h-2 bg-gray-700 rounded-full mx-auto mb-2">
+        {/* Distribution bars */}
+        <div className="flex flex-col flex-1 px-4">
+          <div className="text-xs mb-1 text-center">INITIAL DISTRIBUTION</div>
+          <div className="w-full h-1 bg-gray-700 rounded-full mb-2">
             <div 
               className="h-full bg-white rounded-full transition-all duration-300"
               style={{ 
@@ -115,17 +120,26 @@ const GamePage: React.FC<GamePageProps> = ({ roomId, onLeaveGame }) => {
               }}
             />
           </div>
-          <div className="text-xs mb-1">CURRENT DISTRIBUTION</div>
-          <div className="w-32 h-2 bg-gray-700 rounded-full mx-auto mb-2">
-            <div 
-              className="h-full bg-green-500 rounded-full transition-all duration-300"
-              style={{ 
-                width: `${gameState?.players?.[0] ? gameState.players[0].sats / (gameState.players[0].sats + (gameState.players[1]?.sats || 0)) * 100 : 50}%` 
+          <div className="text-xs mb-1 text-center">CURRENT DISTRIBUTION</div>
+          <div className="w-full h-3 bg-gray-700 rounded-full mb-2 flex overflow-hidden">
+            {/* Player 1 (white) */}
+            <div
+              className="h-full bg-white transition-all duration-300 rounded-l-full"
+              style={{
+                width: `${gameState?.players?.[0] && gameState?.players?.[1] ? (gameState.players[0].sats / (gameState.players[0].sats + gameState.players[1].sats)) * 100 : 50}%`,
+              }}
+            />
+            {/* Player 2 (dark gray) */}
+            <div
+              className="h-full bg-gray-700 transition-all duration-300 rounded-r-full"
+              style={{
+                width: `${gameState?.players?.[0] && gameState?.players?.[1] ? (gameState.players[1].sats / (gameState.players[0].sats + gameState.players[1].sats)) * 100 : 50}%`,
               }}
             />
           </div>
         </div>
-        <div className="flex flex-col items-end">
+        {/* Right player info */}
+        <div className="flex flex-col items-end min-w-[120px]">
           <div className="font-bold text-2xl flex items-center gap-2">
             {gameState?.players?.[1] && (
               <>
@@ -144,6 +158,9 @@ const GamePage: React.FC<GamePageProps> = ({ roomId, onLeaveGame }) => {
           </div>
           <div className="text-xs font-bold mt-1">
             {gameState?.players?.[1]?.sats || 0} sats
+            {typeof gameState?.players?.[1]?.capturePercent === 'number' && (
+              <span className="ml-2 text-green-400">+{gameState.players[1].capturePercent}%</span>
+            )}
           </div>
         </div>
       </div>

@@ -18,6 +18,7 @@ export interface SnakeGameState {
   status: 'waiting' | 'running' | 'ended';
   winner: string | null;
   interval?: NodeJS.Timeout;
+  broadcastInterval?: NodeJS.Timeout;
 }
 
 export const games: { [roomId: string]: SnakeGameState } = {};
@@ -25,7 +26,7 @@ export const games: { [roomId: string]: SnakeGameState } = {};
 const BOARD_WIDTH = 51;
 const BOARD_HEIGHT = 25;
 const INITIAL_SATS = 1000;
-const TICK_RATE = 100; // ms (10 frames per second)
+export const TICK_RATE = 100; // ms (10 frames per second)
 
 function randomPosition() {
   return {
@@ -142,8 +143,23 @@ export function gameTick(roomId: string): void {
     player.snake.unshift(head);
     // Check food
     if (head.x === game.food.x && head.y === game.food.y) {
-      player.sats += 50;
-      if (other) other.sats = Math.max(0, other.sats - 50);
+      // Calculate changeInPoints based on body length
+      const bodyLength = player.snake.length - 1;
+      const totalPoints = (player.sats + (other ? other.sats : 0));
+      let changeInPoints = 0;
+      if (bodyLength === 1) {
+        changeInPoints = Math.floor(totalPoints * 0.02);
+      } else if (bodyLength === 2 || bodyLength === 3) {
+        changeInPoints = Math.floor(totalPoints * 0.04);
+      } else if (bodyLength >= 4 && bodyLength <= 6) {
+        changeInPoints = Math.floor(totalPoints * 0.08);
+      } else if (bodyLength >= 7 && bodyLength <= 10) {
+        changeInPoints = Math.floor(totalPoints * 0.16);
+      } else if (bodyLength >= 11) {
+        changeInPoints = Math.floor(totalPoints * 0.32);
+      }
+      player.sats += changeInPoints;
+      if (other) other.sats = Math.max(0, other.sats - changeInPoints);
       game.food = randomPosition();
     } else {
       player.snake.pop();
@@ -172,6 +188,15 @@ export function getGameState(roomId: string): SnakeGameState | null {
       alive: p.alive,
       spawn: p.spawn,
       initialDirection: p.initialDirection,
+      capturePercent: (() => {
+        const bodyLength = p.snake.length - 1;
+        if (bodyLength === 1) return 2;
+        if (bodyLength === 2 || bodyLength === 3) return 4;
+        if (bodyLength >= 4 && bodyLength <= 6) return 8;
+        if (bodyLength >= 7 && bodyLength <= 10) return 16;
+        if (bodyLength >= 11) return 32;
+        return 0;
+      })(),
     })),
     food: game.food,
     boardSize: game.boardSize,
