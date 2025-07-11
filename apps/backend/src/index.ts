@@ -109,7 +109,6 @@ function startGameForRoom(roomId: string) {
   const interval = setInterval(() => {
     snakeGame.gameTick(roomId);
     const state = snakeGame.getGameState(roomId);
-    console.log(`[TICK] ${roomId} status=${state?.status} sats=${state?.players?.map(p => p.sats).join(',')} time=${Date.now()}`);
     if (state && state.status === 'ended') {
       console.log(`[startGameForRoom] Game ended, clearing intervals for room ${roomId}`);
       const intervals = gameIntervals.get(roomId);
@@ -123,7 +122,6 @@ function startGameForRoom(roomId: string) {
   }, TICK_RATE);
   const broadcastInterval = setInterval(() => {
     const state = snakeGame.getGameState(roomId);
-    console.log(`[BROADCAST] ${roomId} sats=${state?.players?.map(p => p.sats).join(',')} time=${Date.now()}`);
     io.to(roomId).emit('gameState', state);
   }, 16);
   gameIntervals.set(roomId, { interval, broadcastInterval });
@@ -190,16 +188,11 @@ io.on('connection', (socket) => {
     
     // Get the room to check player count
     const room = rooms.get(roomId);
-    if (room) {
-      // Count how many players are in the game room
-      const playersInGame = Array.from(io.sockets.adapter.rooms.get(roomId) || []).length;
-      console.log(`[joinGame] Players in game room ${roomId}: ${playersInGame}`);
-      
-      // If we have 2 players in the game room, start countdown
-      if (playersInGame >= 2) {
-        console.log(`[joinGame] Both players in game room, starting countdown for ${roomId}`);
-        io.to(roomId).emit('startCountdown');
-      }
+    const gameState = snakeGame.getGameState(roomId);
+    if (room && room.players.length === 2 && gameState && gameState.status === 'waiting') {
+      // Only trigger countdown if both players have joined and game is waiting to start
+      console.log(`[joinGame] Both players in game room, starting countdown for ${roomId}`);
+      io.to(roomId).emit('startCountdown');
     }
     
     // Send current state immediately to the joining user
@@ -330,15 +323,30 @@ io.on('connection', (socket) => {
     // If both players have accepted, start the game
     const room = rooms.get(roomId);
     if (room && matchmakingAccepts[roomId].size === 2) {
-      // Move both users from spectators to players
-      for (const user of room.spectators) {
-        room.players.push(user);
+      // Only add the two matched users to players (no duplicates)
+      const acceptedUserIds = Array.from(matchmakingAccepts[roomId]);
+      for (const uid of acceptedUserIds) {
+        // Check if already a player
+        if (!room.players.find(p => p.userId === uid)) {
+          // Try to find in spectators first
+          const spectator = room.spectators.find(u => u.userId === uid);
+          if (spectator) {
+            room.players.push(spectator);
+            room.spectators = room.spectators.filter(u => u.userId !== uid);
+          } else {
+            // Fallback: if not in spectators, check if already a player (shouldn't happen)
+            // Or add a placeholder if needed (should not be needed)
+          }
+        }
       }
-      room.spectators = [];
       // Mark both as ready
       for (const player of room.players) {
-        room.readyPlayers.add(player.userId);
+        if (acceptedUserIds.includes(player.userId)) {
+          room.readyPlayers.add(player.userId);
+        }
       }
+      // Remove any remaining spectators (should be none, but just in case)
+      room.spectators = room.spectators.filter(u => !acceptedUserIds.includes(u.userId));
       // Start the game directly
       startGameForRoom(roomId);
       // Clean up accept state
@@ -352,6 +360,27 @@ io.on('connection', (socket) => {
       matchmakingQueue.splice(idx, 1);
       socket.emit('matchmakingStatus', { status: 'cancelled' });
     }
+  });
+
+  // --- Active Games List for Spectators ---
+  socket.on('getActiveGames', (cb) => {
+    const activeGames = Object.entries(snakeGame.games)
+      .filter(([roomId, game]) => game.status === 'running' && game.players.length === 2)
+      .map(([roomId, game]) => ({
+        roomId,
+        players: game.players.map(p => ({
+          pubkey: p.pubkey,
+          name: p.name,
+          sats: p.sats,
+        })),
+        preferences: {
+          buyIn: game.players[0]?.initialSats || 0,
+          allowSpectators: true, // always true for now
+          // Add more preferences if available
+        },
+        status: game.status,
+      }));
+    cb(activeGames);
   });
 
   socket.on('disconnect', () => {

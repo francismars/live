@@ -13,10 +13,14 @@ const GamePage: React.FC<GamePageProps> = ({ roomId, onLeaveGame }) => {
   const [gameState, setGameState] = useState<any>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
   const { userPubkey } = useNostrAuth();
+  const [showConfirm, setShowConfirm] = useState(false);
   
   // Get player profiles for display
   const playerPubkeys = gameState?.players?.map((p: any) => p.pubkey) || [];
   const profiles = useNostrProfiles(playerPubkeys);
+
+  // Determine if the current user is a player
+  const isPlayer = !!gameState?.players?.find((p: any) => p.pubkey === userPubkey);
 
   useEffect(() => {
     if (!roomId) return;
@@ -186,10 +190,41 @@ const GamePage: React.FC<GamePageProps> = ({ roomId, onLeaveGame }) => {
       <div className="flex justify-center py-4">
         <button
           className="px-6 py-2 rounded bg-red-600 text-white font-bold hover:bg-red-700 transition"
-          onClick={onLeaveGame}
+          onClick={() => setShowConfirm(true)}
         >
-          Leave Game
+          {isPlayer ? 'Abandon Game' : 'Stop Watching'}
         </button>
+        {showConfirm && (
+          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50">
+            <div className="bg-white text-black rounded-2xl shadow-2xl px-8 py-6 flex flex-col gap-4 items-center min-w-[300px] relative">
+              <div className="text-xl font-bold mb-2">
+                {isPlayer ? 'Abandon Game?' : 'Stop Watching?'}
+              </div>
+              <div className="text-gray-600 mb-4">
+                {isPlayer
+                  ? 'Are you sure you want to abandon the game?'
+                  : 'Stop watching and leave this game?'}
+              </div>
+              <div className="flex gap-4">
+                <button
+                  className="px-4 py-2 rounded bg-gray-300 text-black font-bold hover:bg-gray-400 transition"
+                  onClick={() => setShowConfirm(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="px-4 py-2 rounded bg-red-600 text-white font-bold hover:bg-red-700 transition"
+                  onClick={() => {
+                    setShowConfirm(false);
+                    onLeaveGame();
+                  }}
+                >
+                  {isPlayer ? 'Abandon Game' : 'Stop Watching'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

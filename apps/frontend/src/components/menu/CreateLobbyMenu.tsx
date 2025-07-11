@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import useAnimatedPresence from '../shared/useAnimatedPresence';
 
-interface CreateMatchMenuProps {
+export interface CreateLobbyMenuProps {
   show: boolean;
   onBack: () => void;
   onCreate: (options: {
@@ -12,7 +12,7 @@ interface CreateMatchMenuProps {
   }) => void;
 }
 
-const CreateMatchMenu: React.FC<CreateMatchMenuProps> = ({ show, onBack, onCreate }) => {
+const CreateLobbyMenu: React.FC<CreateLobbyMenuProps> = ({ show, onBack, onCreate }) => {
   const isVisible = useAnimatedPresence(show);
   const [gameType, setGameType] = useState<'normal'>('normal');
   const [stake, setStake] = useState('');
@@ -28,7 +28,7 @@ const CreateMatchMenu: React.FC<CreateMatchMenuProps> = ({ show, onBack, onCreat
         <button className="absolute top-4 left-4 text-black hover:text-gray-700 text-2xl font-bold px-2 py-1 rounded-full focus:outline-none" onClick={onBack} aria-label="Back to play menu">
           <span className="material-symbols-outlined">arrow_back</span>
         </button>
-        <div className="text-2xl font-bold mb-6">Create Match</div>
+        <div className="text-2xl font-bold mb-6">Create Lobby</div>
         <div>
           <div className="mb-1 font-semibold">Game Type:</div>
           <div className="flex gap-3">
@@ -65,11 +65,11 @@ const CreateMatchMenu: React.FC<CreateMatchMenuProps> = ({ show, onBack, onCreat
             });
           }}
         >
-          Create Game
+          Create Lobby
         </button>
       </div>
     </div>
   );
 };
 
-export default CreateMatchMenu; 
+export default CreateLobbyMenu; 
