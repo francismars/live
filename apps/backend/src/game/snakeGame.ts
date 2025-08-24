@@ -19,6 +19,16 @@ export interface SnakeGameState {
   winner: string | null;
   interval?: NodeJS.Timeout;
   broadcastInterval?: NodeJS.Timeout;
+  startTime?: number;
+}
+
+// Callback type for game end events
+export type GameEndCallback = (roomId: string, winner: string, players: SnakePlayer[]) => void;
+
+let gameEndCallback: GameEndCallback | null = null;
+
+export function setGameEndCallback(callback: GameEndCallback) {
+  gameEndCallback = callback;
 }
 
 export const games: { [roomId: string]: SnakeGameState } = {};
@@ -77,6 +87,7 @@ export function initGame(roomId: string, players: Array<{ pubkey: string; name: 
     boardSize: { width: BOARD_WIDTH, height: BOARD_HEIGHT },
     status: 'running',
     winner: null,
+    startTime: Date.now(),
   };
   console.log(`[initGame] Game initialized for room ${roomId}:`, games[roomId]);
 }
@@ -95,6 +106,7 @@ export function handleInput(roomId: string, pubkey: string, direction: string): 
 export function gameTick(roomId: string): void {
   const game = games[roomId];
   if (!game || game.status !== 'running') return;
+  
   // Move snakes
   for (const player of game.players) {
     if (!player.alive) {
@@ -160,24 +172,56 @@ export function gameTick(roomId: string): void {
       }
       player.sats += changeInPoints;
       if (other) other.sats = Math.max(0, other.sats - changeInPoints);
+      
+      console.log(`[gameTick] Food captured! Player ${player.pubkey} now has ${player.sats} sats, other has ${other?.sats || 0}`);
+      
       game.food = randomPosition();
     } else {
       player.snake.pop();
     }
   }
+  
   // Check win
   for (const player of game.players) {
     if (player.sats >= INITIAL_SATS * 2) {
+      console.log(`[gameTick] Game ended! Player ${player.pubkey} captured all sats (${player.sats})`);
       game.status = 'ended';
       game.winner = player.pubkey;
+      
+      // Notify callback about game end
+      if (gameEndCallback) {
+        gameEndCallback(roomId, player.pubkey, game.players);
+      }
+      
+      return;
     }
+  }
+  
+  // Check for game timeout (5 minutes)
+  if (game.startTime && (Date.now() - game.startTime) > 5 * 60 * 1000) {
+    console.log(`[gameTick] Game ended due to timeout!`);
+    game.status = 'ended';
+    // Determine winner based on sats when timeout occurs
+    const winner = game.players.reduce((prev, current) => 
+      (prev.sats > current.sats) ? prev : current
+    );
+    game.winner = winner.pubkey;
+    console.log(`[gameTick] Timeout winner: ${winner.pubkey} with ${winner.sats} sats`);
+    
+    // Notify callback about game end
+    if (gameEndCallback) {
+      gameEndCallback(roomId, winner.pubkey, game.players);
+    }
+    
+    return;
   }
 }
 
 export function getGameState(roomId: string): SnakeGameState | null {
   const game = games[roomId];
   if (!game) return null;
-  return {
+  
+  const state = {
     players: game.players.map(p => ({
       pubkey: p.pubkey,
       name: p.name,
@@ -203,4 +247,14 @@ export function getGameState(roomId: string): SnakeGameState | null {
     status: game.status,
     winner: game.winner,
   };
+  
+  if (game.status === 'ended') {
+    console.log(`[getGameState] Sending ended game state for room ${roomId}:`, {
+      status: state.status,
+      winner: state.winner,
+      players: state.players.map(p => ({ pubkey: p.pubkey, sats: p.sats }))
+    });
+  }
+  
+  return state;
 } 

@@ -9,6 +9,6 @@ export default defineConfig({
     proxy: {
       '/api': 'http://localhost:3001',
     },
-    allowedHosts: ["f2a0d09c671d.ngrok-free.app"],
+    allowedHosts: ["170.75.173.210"], // Replace with your actual LunaNode domain
   },
 });

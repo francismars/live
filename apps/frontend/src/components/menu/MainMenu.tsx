@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import GameTitle from '../layout/GameTitle';
 import UserAvatarButton from '../layout/UserAvatarButton';
 import UserDropdown from '../layout/UserDropdown';
@@ -18,6 +18,7 @@ import SignUpModal from './SignUpModal';
 import KeySignInModal from './KeySignInModal';
 import { socket } from '../../socket';
 import GamePage from '../game/GamePage';
+import StatsModal from '../profile/StatsModal';
 
 const MainMenu: React.FC = () => {
   const [menu, setMenu] = useState<'main' | 'play'>('main');
@@ -51,6 +52,7 @@ const MainMenu: React.FC = () => {
   const [showWatchModal, setShowWatchModal] = useState(false);
   const [activeGames, setActiveGames] = useState<any[]>([]);
   const [loadingGames, setLoadingGames] = useState(false);
+  const [showStats, setShowStats] = useState(false);
 
   const {
     userPubkey,
@@ -212,6 +214,10 @@ const MainMenu: React.FC = () => {
     return () => clearInterval(interval);
   }, [showWatchModal]);
 
+  const handleStats = () => {
+    setShowStats(true);
+  };
+
   return (
     <div className="w-screen h-screen bg-black text-white font-mono flex flex-col justify-between relative overflow-hidden">
       <div className="flex justify-between items-center w-full px-12 pt-8 relative">
@@ -226,7 +232,7 @@ const MainMenu: React.FC = () => {
             <ChatButton />
           </button>
           <UserAvatarButton onClick={handleAvatarClick} imageUrl={userImage || undefined} />
-          <UserDropdown show={showDropdown} onClose={handleDropdownClose} onLogout={handleLogout} onProfile={handleProfile} />
+          <UserDropdown show={showDropdown} onClose={handleDropdownClose} onLogout={handleLogout} onProfile={handleProfile} onStats={handleStats} />
           {showChat && (
             <div className="absolute top-16 right-0 mt-2 z-50">
               <ChatPanel onClose={() => setShowChat(false)} userPubkey={userPubkey} userPrivkey={userPrivkey} authMethod={authMethod} />
@@ -259,7 +265,14 @@ const MainMenu: React.FC = () => {
       )}
       {activeRoomId && gameStarted && (
         <div className="flex flex-col items-center justify-center flex-1 w-full">
-          <GamePage roomId={activeRoomId} onLeaveGame={handleLeaveGame} />
+          <GamePage 
+            roomId={activeRoomId} 
+            onLeaveGame={handleLeaveGame} 
+            onReturnToLobby={() => {
+              setGameStarted(false);
+              setInLobby(true);
+            }}
+          />
         </div>
       )}
       {/* Main menu, only shown if not in a game or lobby */}
@@ -432,6 +445,7 @@ const MainMenu: React.FC = () => {
         onClose={() => setShowKeySignIn(false)}
         onSignIn={signInWithKey}
       />
+      <StatsModal isOpen={showStats} onClose={() => setShowStats(false)} />
     </div>
   );
 };
